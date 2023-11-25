@@ -1,0 +1,190 @@
+service: group-chat-app
+frameworkVersion: "3"
+
+provider:
+  name: aws
+  runtime: nodejs16.x
+  region: us-east-1
+  environment:
+    CHAT_MESSAGES_TABLE: ${self:resources.Resources.chatMessages.Properties.TableName}
+    CHAT_GROUPS_TABLE: ${self:resources.Resources.chatGroups.Properties.TableName}
+    CHAT_MEMBERS_TABLE: ${self:resources.Resources.chatMembers.Properties.TableName}
+    CHAT_CONNECTIONS_TABLE: ${self:resources.Resources.connections.Properties.TableName}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - "dynamodb:PutItem"
+            - "dynamodb:GetItem"
+            - "dynamodb:DeleteItem"
+            - "dynamodb:Scan"
+            - "dynamodb:UpdateItem"
+            - "dynamodb:Query"
+          Resource: "*"
+        - Effect: Allow
+          Action:
+            - "execute-api:ManageConnections"
+          Resource: "arn:aws:execute-api:*:*:**/@connections/*"
+
+functions:
+# Lambdas necessary for the WebSocket API
+  connectHandler:
+    handler: handler.connectHandler
+    events:
+      - websocket:
+          route: $connect
+
+  disconnectHandler:
+    handler: handler.disconnectHandler
+    events:
+      - websocket:
+          route: $disconnect
+
+  defaultHandler:
+    handler: handler.defaultHandler
+    events:
+      - websocket:
+          route: $default
+
+# WebSocket API routes
+  selectUsernameHandler:
+    handler: handler.selectUsernameHandler
+    events:
+      - websocket:
+          route: selectUsername
+
+  selectGroupHandler:
+    handler: handler.selectGroupHandler
+    events:
+      - websocket:
+          route: selectGroup
+
+  sendMessageToGroupHandler:
+    handler: handler.sendMessageToGroupHandler
+    events:
+      - websocket:
+          route: sendMessageToGroup
+          
+  # HTTP API routes
+  createGroupHandler:
+    handler: handler.createGroupHandler
+    events:
+      - http:
+          path: /groups
+          method: post
+          cors: true
+
+  getGroupByIdHandler:
+    handler: handler.getGroupByIdHandler
+    events:
+      - http:
+          path: /groups/{dbGroupId}
+          method: get
+          cors: true
+
+  joinGroupHandler:
+    handler: handler.joinGroupHandler
+    events:
+      - http:
+          path: /groups/members
+          method: post
+          cors: true
+  
+  getGroupsByUsernameHandler:
+    handler: handler.getGroupsByUsernameHandler
+    events:
+      - http:
+          path: /groups/user/{username}
+          method: get
+          cors: true
+  
+  getMessagesByGroupIdHandler:
+    handler: handler.getMessagesByGroupIdHandler
+    events:
+      - http:
+          path: /groups/messages/{groupId}
+          method: get
+          cors: true
+  
+
+
+resources:
+  Resources:
+    chatMessages:
+      Type: "AWS::DynamoDB::Table"
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: "groupId"
+            AttributeType: "S"
+          - AttributeName: "dateTime"
+            AttributeType: "S"
+        KeySchema:
+          - AttributeName: "groupId"
+            KeyType: "HASH"
+          - AttributeName: "dateTime"
+            KeyType: "RANGE"
+        BillingMode: PAY_PER_REQUEST
+        TableName: "chat_messages"
+        
+    chatGroups:
+      Type: "AWS::DynamoDB::Table"
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: "groupId"
+            AttributeType: "S"
+          - AttributeName: "dbGroupId"
+            AttributeType: "S"
+        KeySchema:
+          - AttributeName: "groupId"
+            KeyType: "HASH"
+          - AttributeName: "dbGroupId"
+            KeyType: "RANGE"
+        BillingMode: PAY_PER_REQUEST
+        TableName: "chat_groups"
+
+    chatMembers:
+      Type: "AWS::DynamoDB::Table"
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: "groupId"
+            AttributeType: "S"
+          - AttributeName: "memberUsername"
+            AttributeType: "S"
+        KeySchema:
+          - AttributeName: "groupId"
+            KeyType: "HASH"
+          - AttributeName: "memberUsername"
+            KeyType: "RANGE"
+        GlobalSecondaryIndexes:
+          - IndexName: "groupId-index"
+            KeySchema:
+              - AttributeName: "groupId"
+                KeyType: "HASH"
+            Projection:
+              ProjectionType: "ALL"
+        BillingMode: PAY_PER_REQUEST
+        TableName: "chat_members"
+    
+    connections:
+      Type: "AWS::DynamoDB::Table"
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: "connectionId"
+            AttributeType: "S"
+          - AttributeName: "groupId"
+            AttributeType: "S"
+        KeySchema:
+          - AttributeName: "connectionId"
+            KeyType: "HASH"
+        GlobalSecondaryIndexes:
+          - IndexName: "groupId-index"
+            KeySchema:
+              - AttributeName: "groupId"
+                KeyType: "HASH"
+            Projection:
+              ProjectionType: "ALL"
+        BillingMode: PAY_PER_REQUEST
+        TableName: "connections"
+
+    

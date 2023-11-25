@@ -1,0 +1,12 @@
+<div #chatContainer *ngIf="username && groupId" class="chat-container">
+  <h2>Chat for {{ groupId }}</h2>
+      <div class="message" [ngClass]="{'my-message': message.username === username}" *ngFor="let message of messages">
+        <p style="font-weight: bold">{{ message.username }}</p>
+        <p style="font-style: italic">{{ message.dateTime | date:'medium' }}</p>
+        <p>{{ message.message }}</p>
+      </div>
+</div>
+<div style="margin-top: 20px">
+  <input [formControl]="messageForm" placeholder="Message" />
+  <button (click)="sendMessage()">Send</button>
+</div>

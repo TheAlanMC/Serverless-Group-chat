@@ -1,0 +1,13 @@
+<input [formControl]="usernameForm" placeholder="Search for users">
+<button (click)="getGroups()">Get Groups</button>
+
+<ul>
+  <li *ngFor="let group of groups">
+    <button (click)="openGroup(group.groupId)">{{ group.groupId }}</button>
+  </li>
+</ul>
+
+<div *ngIf="selectedGroupId">
+  <h2>Group {{ selectedGroupId }}</h2>
+  <app-chat [groupId]="selectedGroupId" [username]="username"></app-chat>
+</div>
